@@ -1,14 +1,33 @@
 # training-db MCP server
 
-A standalone stdio MCP server that exposes a fitness-tracking Supabase
-domain as **typed, user-scoped tools**. One process per chat session, bound to a
-single `user_id`. Multi-user isolation is enforced server-side (not by the
-prompt): no tool ever accepts a `user_id` parameter.
+A standalone **stdio MCP server** that exposes a fitness-tracking Postgres/Supabase
+domain as **typed, user-scoped tools** for an LLM agent.
 
-The host process spawns one MCP instance per chat session and injects the bound
-`user_id` and database connection string into the process environment at spawn
-time. The server is a self-contained stdio process with no knowledge of where it
-is deployed.
+The point of interest is the **isolation model**: one server process per session,
+bound to a single `user_id` at spawn time. Multi-tenant isolation is enforced
+**server-side, in code — never by the prompt**. No tool ever accepts a `user_id`
+parameter, so a model cannot read or write another user's data even if it tries.
+
+This is a real-world example extracted from a production AI coaching app, not a
+generic framework. The domain tools are fitness-specific (workouts, nutrition,
+weekly reviews); the reusable idea is the *structure*: typed tools + a contract
+that binds identity at the boundary + ownership checks on every row.
+
+## Why server-side identity
+
+A common MCP pattern hands the agent a broad database tool and tells it, in the
+prompt, to "always filter by the current user." That delegates a security
+invariant to a non-deterministic model. Here the invariant lives in code:
+
+- `MCP_USER_ID` is read **once**, at process startup (`src/ctx.ts`), and fails
+  fast if missing or not a uuid. The agent never sees it and cannot change it.
+- Every mutation (and every read targeting a specific id) calls
+  `requireOwned(...)` (`src/ownership.ts`): an id owned by another user resolves
+  to 0 rows → `NotFoundError`, never a mutation.
+- There is no code path that touches a row without proving ownership first.
+
+The model gets a clean, typed tool surface; the safety guarantee does not depend
+on the model behaving.
 
 ## Environment variables
 
@@ -18,10 +37,12 @@ is deployed.
 | `SUPABASE_DB_URL` | yes | Postgres connection string for the Supabase pooler. Used by the `pg` pool. **Fails fast** if missing. Never hardcoded. |
 | `SUPABASE_DB_SSL` | no | TLS toggle. Default **on** with `{ rejectUnauthorized: false }` (the Supabase pooler typically requires SSL). Set to `0`/`false`/`off`/`no` to disable (e.g. local plain Postgres). |
 | `NUTRITION_USDA_API_KEY` | yes (nutrition) | API key for USDA FoodData Central, used by the nutrition lookup pipeline. Validated at startup. |
-| `ROADMAP_PROJECTION_SECRET` | no | Bearer token for an optional internal projection endpoint. If absent, roadmap projections resolve to `null` (the bundle never breaks). |
+| `ROADMAP_PROJECTION_BASE_URL` | no | Base URL for an optional internal projection endpoint. If absent, roadmap projections resolve to `null` (the bundle never breaks). |
+| `ROADMAP_PROJECTION_SECRET` | no | Bearer token for the optional projection endpoint above. |
 | `NUTRITION_CACHE_DIR` | no | Directory for the on-disk nutrition lookup cache. |
 
-No secrets live in the code; all credentials arrive via env at spawn time.
+No secrets live in the code; all credentials arrive via env at spawn time. See
+`.env.example` for a template and `mcp.example.json` for a sample client config.
 
 ## Build & run
 
@@ -29,11 +50,11 @@ No secrets live in the code; all credentials arrive via env at spawn time.
 npm install
 npm run build        # tsc → dist/
 npm start            # node dist/index.js  (stdio; requires env above)
-npm test             # node --test smoke tests (no live DB)
+npm test             # node --test, runs without a live DB
 ```
 
-The `tools/list` request responds even with only the Phase 0 `echo_user` debug
-tool, which returns `{ user_id }` to confirm the bound USER_ID.
+The `tools/list` request responds even with only the minimal `echo_user` tool,
+which returns `{ user_id }` to confirm the bound identity.
 
 ## Tool-module contract
 
@@ -55,11 +76,11 @@ handler, wraps success as `{ content: [{ type: 'text', text: JSON.stringify(resu
 and maps any thrown error via `toToolError` (structured `{ code, message }` —
 never a silent no-op).
 
-### Adding tools (Phase 1-5)
+### Adding tools
 
 1. In a tool module file, export an array of `ToolModule`, e.g.
    `export const readTools = [getSchedaTool, getSessionTool, ...]`.
-2. In `src/index.ts`, import and spread it into `allTools` at the marked spot:
+2. In `src/index.ts`, import and spread it into `allTools`:
    ```ts
    const allTools: AnyToolModule[] = [echoUserTool, ...readTools, ...writeTools];
    ```
@@ -93,5 +114,10 @@ queryOne<T>(sql, params?): Promise<T | null>
 tx<T>(cb: (client: Queryable) => Promise<T>): Promise<T>  // BEGIN/COMMIT, ROLLBACK on throw
 ```
 
-`tx` is mandated by `pg` (not `db.sh`) so later phases get real transactions for
-bitemporal versioning + audit and `replace_program`.
+A direct `pg` connection (rather than a higher-level HTTP query wrapper) is used
+so handlers get real transactions for bitemporal versioning + audit and
+`replace_program`.
+
+## License
+
+[MIT](./LICENSE) © 2026 Alessandro Conforti.

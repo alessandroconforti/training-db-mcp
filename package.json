@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
+  "author": "Alessandro Conforti",
   "description": "MCP stdio server exposing a fitness-tracking Supabase domain as typed, user-scoped tools.",
   "repository": {
     "type": "git",
