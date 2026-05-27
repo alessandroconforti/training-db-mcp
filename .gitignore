@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Internal pre-publication audit trail — not part of the published artifact
+EXTRACTION_REPORT.md
+.env

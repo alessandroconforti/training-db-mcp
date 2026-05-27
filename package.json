@@ -1,0 +1,40 @@
+{
+  "name": "training-db-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "MCP stdio server exposing a fitness-tracking Supabase domain as typed, user-scoped tools.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alessandroconforti/training-db-mcp.git"
+  },
+  "homepage": "https://github.com/alessandroconforti/training-db-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/alessandroconforti/training-db-mcp/issues"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "training-db-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "node --import tsx --test \"src/__tests__/smoke.test.ts\" \"src/__tests__/read_tools.test.ts\" \"src/__tests__/write_tools.test.ts\" \"src/__tests__/write_structural.test.ts\" \"src/__tests__/write_daily.test.ts\" \"src/__tests__/write_session_log.test.ts\" \"src/__tests__/write_planning_review.test.ts\" \"src/__tests__/intake.test.ts\" \"src/__tests__/nutrition_decomposition.test.ts\" \"src/__tests__/nutrition_workflow_e2e.test.ts\" \"src/__tests__/query_tokens.test.ts\" \"src/__tests__/observations.test.ts\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "pg": "^8.13.0",
+    "undici": "^6.25.0",
+    "zod": "^3.23.0",
+    "zod-to-json-schema": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  }
+}

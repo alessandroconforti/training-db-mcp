@@ -1,0 +1,16 @@
+{
+  "//": "Example MCP client config. Real values are injected per-session by the host process; never commit real env values.",
+  "mcpServers": {
+    "training-db": {
+      "command": "node",
+      "args": [
+        "./dist/index.js"
+      ],
+      "env": {
+        "MCP_USER_ID": "${MCP_USER_ID}",
+        "SUPABASE_DB_URL": "${SUPABASE_DB_URL}",
+        "SUPABASE_DB_SSL": "1"
+      }
+    }
+  }
+}
